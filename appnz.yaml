@@ -1,0 +1,16 @@
+name: polygon
+runtime: server
+build:
+  command: make build
+  dockerfile: Dockerfile
+output: web
+run:
+  command: ./bin/polygonalize-server
+  port: 8080
+env:
+  POLYGONALIZE_MAX_UPLOAD_MB: "16"
+github:
+  repo: lee101/polygonalize
+  branch: main
+  autoDeploy: true
+

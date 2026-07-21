@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#090b10">
+  <title>Polygonalize — free image & video low-poly studio</title>
+  <meta name="description" content="Turn images and video into temporally stable low-poly art. Free, open source, private-by-default Go WebAssembly creative tool.">
+  <link rel="canonical" href="https://polygon.app.nz/">
+  <meta property="og:title" content="Polygonalize — low-poly images and video">
+  <meta property="og:description" content="A free open-source Go/WASM low-poly studio with stable video topology and a Three.js 3D preview.">
+  <meta property="og:url" content="https://polygon.app.nz/">
+  <meta property="og:type" content="website">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Polygonalize","applicationCategory":"MultimediaApplication","operatingSystem":"Web","url":"https://polygon.app.nz/","isAccessibleForFree":true,"license":"https://opensource.org/license/mit","codeRepository":"https://github.com/lee101/polygonalize"}</script>
+</head>
+<body>
+  <header class="site-head">
+    <a class="brand" href="/" aria-label="Polygonalize home"><span class="mark" aria-hidden="true"></span><span>polygonalize</span></a>
+    <nav aria-label="Project links"><a href="https://app.nz/leepenkman/polygonalize">app.nz source</a><a href="https://github.com/lee101/polygonalize">GitHub ↗</a></nav>
+  </header>
+
+  <main>
+    <section class="intro">
+      <div class="eyebrow"><i></i> Free · open source · runs locally</div>
+      <h1>Every frame,<br><em>one stable mesh.</em></h1>
+      <p>Drop an image or video. A Go engine finds the important edges, builds a deterministic triangle mesh, then keeps its topology steady across frames—without uploading your media.</p>
+    </section>
+
+    <section class="studio" aria-label="Polygonalize studio">
+      <aside class="controls">
+        <label class="drop" id="dropZone" tabindex="0">
+          <input id="fileInput" type="file" accept="image/*,video/*" hidden>
+          <span class="drop-icon">↗</span>
+          <strong>Drop image or video</strong>
+          <small>or choose a file · processed in your tab</small>
+        </label>
+
+        <div class="field">
+          <div class="field-head"><label for="points">Mesh detail</label><output id="pointsValue">220 points</output></div>
+          <input id="points" type="range" min="40" max="700" step="10" value="220">
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="edgeBias">Follow edges</label><output id="edgeValue">72%</output></div>
+          <input id="edgeBias" type="range" min="0" max="100" value="72">
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="stability">Temporal stability</label><output id="stabilityValue">88%</output></div>
+          <input id="stability" type="range" min="0" max="98" value="88">
+          <small>Fixed geometry + smoothed colour reduces video flicker.</small>
+        </div>
+        <fieldset>
+          <legend>View</legend>
+          <div class="segmented"><button class="view active" data-view="flat">Flat</button><button class="view" data-view="wire">Wire</button><button class="view" data-view="three">3D lift</button></div>
+        </fieldset>
+        <div class="actions"><button id="randomize" class="secondary">New seed</button><button id="download" class="primary">Export SVG</button></div>
+        <p class="engine"><span id="engineDot"></span><span id="engineStatus">Starting Go/WASM…</span></p>
+      </aside>
+
+      <div class="stage" id="stage">
+        <div class="stage-top"><span id="fileName">GENERATED DEMO · 960 × 620</span><span id="stats">— triangles</span></div>
+        <canvas id="output" width="960" height="620" aria-label="Polygonalized output"></canvas>
+        <div id="threeStage" hidden></div>
+        <video id="video" muted playsinline loop hidden></video>
+        <div class="stage-bottom"><span><b>Renderer</b> <i id="renderer">Canvas 2D</i></span><span>Media stays on this device</span></div>
+      </div>
+    </section>
+
+    <section class="how">
+      <div><span>01</span><h2>Edge-aware</h2><p>Sobel energy puts detail where the image changes, not where a square grid says it should.</p></div>
+      <div><span>02</span><h2>Frame-stable</h2><p>Video reuses one seeded Delaunay topology and eases colours over time. No triangle popping.</p></div>
+      <div><span>03</span><h2>Fast by context</h2><p>Go/WASM computes the mesh; Canvas handles flat video; Three.js takes over only for the 3D view.</p></div>
+    </section>
+
+    <section class="open"><p>Built in the open</p><h2>The engine, CLI, WASM bridge and app.nz server are all MIT licensed.</h2><div><a href="https://github.com/lee101/polygonalize">Read the code on GitHub ↗</a><a href="https://app.nz/blog/building-polygonalize-go-wasm">How we built it →</a></div></section>
+  </main>
+  <footer><span>Polygonalize · an app.nz open-source experiment</span><a href="https://app.nz">Built and hosted on app.nz</a></footer>
+  <script src="/assets/wasm_exec.js"></script>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
+

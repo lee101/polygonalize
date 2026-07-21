@@ -1,0 +1,8 @@
+/bin/
+/web/assets/*.wasm
+/web/assets/wasm_exec.js
+*.svg
+*.png
+*.mp4
+*.webm
+!visualbench/*.webp
