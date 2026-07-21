@@ -19,6 +19,8 @@ The media stays in the browser unless the server API is explicitly used.
 - Three.js provides an optional interactive 3D lift.
 - A temporal `Session` keeps vertex positions and triangle indices fixed.
 - Seeded sampling makes renders reproducible.
+- Detail scales to 20,000 triangles with a linear-time edge-adaptive topology.
+- Triangle, circle, square, diamond, hexagon, and custom transparent primitives.
 - The Go package, CLI, JSON/SVG API and UI share one engine.
 
 This is a clean-room successor to the interaction ideas in the older private
@@ -38,22 +40,27 @@ Create an SVG from the terminal:
 
 ```bash
 ./bin/polygonalize -in photo.jpg -out photo-low-poly.svg \
-  -points 260 -edge-bias 0.76 -seed 42
+  -triangles 12000 -primitive hexagon -edge-bias 0.76 -seed 42
 ```
 
 Use the server API:
 
 ```bash
-curl -F file=@photo.jpg -F points=260 \
+curl -F file=@photo.jpg -F triangles=12000 -F primitive=diamond \
   https://polygon.app.nz/api/polygonalize/image > photo.svg
 
-curl -F file=@photo.jpg -F points=260 \
+curl -F file=@photo.jpg -F triangles=20000 \
   https://polygon.app.nz/api/mesh | jq .triangles[0]
 
 # Serverless fallback for video (capped at 12 seconds / 720p)
-curl -F file=@clip.mp4 -F points=220 -F stability=.9 \
+curl -F file=@clip.mp4 -F triangles=2000 -F primitive=circle -F stability=.9 \
   https://polygon.app.nz/api/polygonalize/video > clip-low-poly.webm
 ```
+
+The browser can also upload a PNG, WebP, or SVG as a custom render primitive.
+Its native colour and transparency are preserved. Primitive pixels—including
+alpha—never enter edge detection or topology generation. Source-image alpha is
+also intentionally ignored by the Go algorithm.
 
 ## Architecture
 
@@ -61,7 +68,7 @@ curl -F file=@clip.mp4 -F points=220 -F stability=.9 \
 image/video pixels
        │
        ▼
-Go edge sampler → seeded points → Delaunay topology
+Go edge sampler → Delaunay / high-detail adaptive topology
        │                              │
        ├─ browser WASM ─ Canvas 2D / Three.js
        ├─ CLI ────────── SVG

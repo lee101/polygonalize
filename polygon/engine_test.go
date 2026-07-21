@@ -1,6 +1,7 @@
 package polygon
 
 import (
+	"bytes"
 	"encoding/json"
 	"image"
 	"image/color"
@@ -60,6 +61,47 @@ func TestSessionKeepsTopologyAcrossFrames(t *testing.T) {
 	for i := range a.Triangles {
 		if a.Triangles[i].A != b.Triangles[i].A || a.Triangles[i].B != b.Triangles[i].B || a.Triangles[i].C != b.Triangles[i].C {
 			t.Fatal("triangle indices changed")
+		}
+	}
+}
+
+func TestHighDetailMeshStaysWithinTwentyThousandTriangles(t *testing.T) {
+	mesh := Generate(fixture(), Options{Triangles: MaxTriangles, Seed: 9, EdgeBias: .8})
+	if len(mesh.Triangles) > MaxTriangles || len(mesh.Triangles) < 19000 {
+		t.Fatalf("high-detail mesh has %d triangles", len(mesh.Triangles))
+	}
+	if len(mesh.Points) < 9000 {
+		t.Fatalf("high-detail topology has only %d points", len(mesh.Points))
+	}
+}
+
+func TestAlphaDoesNotAffectAlgorithm(t *testing.T) {
+	opaque := image.NewNRGBA(image.Rect(0, 0, 32, 24))
+	transparent := image.NewNRGBA(opaque.Bounds())
+	for y := 0; y < 24; y++ {
+		for x := 0; x < 32; x++ {
+			alpha := uint8((x*17 + y*11) % 256)
+			rgb := color.NRGBA{R: uint8(x * 7), G: uint8(y * 9), B: uint8(x + y), A: 255}
+			opaque.SetNRGBA(x, y, rgb)
+			rgb.A = alpha
+			transparent.SetNRGBA(x, y, rgb)
+		}
+	}
+	opts := Options{Triangles: 120, Seed: 4, EdgeBias: .7}
+	if a, b := Generate(opaque, opts), Generate(transparent, opts); !reflect.DeepEqual(a, b) {
+		t.Fatal("alpha channel changed topology or sampled colours")
+	}
+}
+
+func TestSVGPrimitiveTypes(t *testing.T) {
+	mesh := Generate(fixture(), Options{Triangles: 80, Seed: 3})
+	for _, primitive := range []string{"triangle", "circle", "square", "diamond", "hexagon"} {
+		var out bytes.Buffer
+		if err := WriteSVGPrimitive(&out, mesh, primitive); err != nil {
+			t.Fatalf("%s: %v", primitive, err)
+		}
+		if !strings.Contains(out.String(), "<polygon") {
+			t.Fatalf("%s produced no SVG polygons", primitive)
 		}
 	}
 }

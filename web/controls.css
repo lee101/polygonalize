@@ -1,0 +1,47 @@
+.controls {
+  gap: 18px;
+}
+
+select {
+  width: 100%;
+  border: 1px solid #343942;
+  background: #181c23;
+  color: #eef0f4;
+  padding: 9px 10px;
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+select:focus {
+  border-color: var(--acid);
+}
+
+.primitive-upload {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px dashed #4a505c;
+  padding: 9px 10px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.primitive-upload[hidden] {
+  display: none;
+}
+
+.primitive-upload:hover {
+  border-color: var(--acid);
+}
+
+.primitive-upload b {
+  color: var(--acid);
+  font-weight: 650;
+  max-width: 105px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

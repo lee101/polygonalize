@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#090b10">
   <title>Polygonalize — free image & video low-poly studio</title>
-  <meta name="description" content="Turn images and video into temporally stable low-poly art. Free, open source, private-by-default Go WebAssembly creative tool.">
+  <meta name="description" content="Turn images and video into temporally stable low-poly art with up to 20,000 triangles and custom transparent primitives. Free, open-source Go WebAssembly.">
   <link rel="canonical" href="https://polygon.app.nz/">
   <meta property="og:title" content="Polygonalize — low-poly images and video">
-  <meta property="og:description" content="A free open-source Go/WASM low-poly studio with stable video topology and a Three.js 3D preview.">
+  <meta property="og:description" content="A free Go/WASM low-poly studio with stable video, up to 20k triangles, custom transparent primitives, and Three.js preview.">
   <meta property="og:url" content="https://polygon.app.nz/">
   <meta property="og:type" content="website">
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/controls.css">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Polygonalize","applicationCategory":"MultimediaApplication","operatingSystem":"Web","url":"https://polygon.app.nz/","isAccessibleForFree":true,"license":"https://opensource.org/license/mit","codeRepository":"https://github.com/lee101/polygonalize"}</script>
 </head>
 <body>
@@ -37,8 +38,9 @@
         </label>
 
         <div class="field">
-          <div class="field-head"><label for="points">Mesh detail</label><output id="pointsValue">220 points</output></div>
-          <input id="points" type="range" min="40" max="700" step="10" value="220">
+          <div class="field-head"><label for="triangles">Mesh detail</label><output id="trianglesValue">800 triangles</output></div>
+          <input id="triangles" type="range" min="100" max="20000" step="100" value="800">
+          <small>Scales from loose low-poly work to 20k triangles.</small>
         </div>
         <div class="field">
           <div class="field-head"><label for="edgeBias">Follow edges</label><output id="edgeValue">72%</output></div>
@@ -48,6 +50,22 @@
           <div class="field-head"><label for="stability">Temporal stability</label><output id="stabilityValue">88%</output></div>
           <input id="stability" type="range" min="0" max="98" value="88">
           <small>Fixed geometry + smoothed colour reduces video flicker.</small>
+        </div>
+        <div class="field">
+          <div class="field-head"><label for="primitive">Primitive</label><output id="primitiveStatus">Mesh fill</output></div>
+          <select id="primitive">
+            <option value="triangle">Triangles</option>
+            <option value="circle">Circles</option>
+            <option value="square">Squares</option>
+            <option value="diamond">Diamonds</option>
+            <option value="hexagon">Hexagons</option>
+            <option value="custom">Custom upload</option>
+          </select>
+          <label class="primitive-upload" id="primitiveUpload" hidden>
+            <input id="primitiveInput" type="file" accept="image/png,image/webp,image/svg+xml" hidden>
+            <span>PNG, WebP, or SVG</span><b id="primitiveFile">Choose file</b>
+          </label>
+          <small id="primitiveHint">Shape selection only affects rendering, never edge sampling.</small>
         </div>
         <fieldset>
           <legend>View</legend>
@@ -67,9 +85,9 @@
     </section>
 
     <section class="how">
-      <div><span>01</span><h2>Edge-aware</h2><p>Sobel energy puts detail where the image changes, not where a square grid says it should.</p></div>
+      <div><span>01</span><h2>Edge-aware at 20k</h2><p>Sobel energy guides both Delaunay and the linear-time high-detail topology, up to 20,000 triangles.</p></div>
       <div><span>02</span><h2>Frame-stable</h2><p>Video reuses one seeded Delaunay topology and eases colours over time. No triangle popping.</p></div>
-      <div><span>03</span><h2>Fast by context</h2><p>Go/WASM computes the mesh; Canvas handles flat video; Three.js takes over only for the 3D view.</p></div>
+      <div><span>03</span><h2>Your primitive</h2><p>Use five built-in shapes or upload a transparent PNG, WebP, or SVG. Its alpha is rendered, never sampled.</p></div>
     </section>
 
     <section class="open"><p>Built in the open</p><h2>The engine, CLI, WASM bridge and app.nz server are all MIT licensed.</h2><div><a href="https://github.com/lee101/polygonalize">Read the code on GitHub ↗</a><a href="https://app.nz/blog/building-polygonalize-go-wasm">How we built it →</a></div></section>
@@ -79,4 +97,3 @@
   <script type="module" src="/app.js"></script>
 </body>
 </html>
-

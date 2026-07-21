@@ -4,24 +4,36 @@ package polygon
 import (
 	"encoding/json"
 	"image"
+	"image/color"
 	"math"
 	"math/rand"
 	"sort"
 )
 
+const MaxTriangles = 20000
+
 type Options struct {
-	Points    int     `json:"points"`
+	Points    int     `json:"points,omitempty"`
+	Triangles int     `json:"triangles,omitempty"`
 	EdgeBias  float64 `json:"edgeBias"`
 	Seed      int64   `json:"seed"`
 	Stability float64 `json:"stability"`
 }
 
 func (o Options) normalized() Options {
-	if o.Points < 24 {
+	if o.Triangles > 0 {
+		if o.Triangles < 32 {
+			o.Triangles = 32
+		}
+		if o.Triangles > MaxTriangles {
+			o.Triangles = MaxTriangles
+		}
+		o.Points = max(24, (o.Triangles+6)/2)
+	} else if o.Points < 24 {
 		o.Points = 180
 	}
-	if o.Points > 1600 {
-		o.Points = 1600
+	if o.Points > (MaxTriangles+6)/2 {
+		o.Points = (MaxTriangles + 6) / 2
 	}
 	if o.EdgeBias <= 0 {
 		o.EdgeBias = 0.72
@@ -36,6 +48,13 @@ func (o Options) normalized() Options {
 		o.Stability = 1
 	}
 	return o
+}
+
+func (o Options) triangleTarget() int {
+	if o.Triangles > 0 {
+		return o.Triangles
+	}
+	return min(MaxTriangles, max(32, o.Points*2-6))
 }
 
 type Point struct {
@@ -75,9 +94,13 @@ func (s *Session) Frame(img image.Image) Mesh {
 		return Mesh{}
 	}
 	if len(s.norm) == 0 {
-		s.norm = choosePoints(img, s.opts)
-		actual := scalePoints(s.norm, w, h)
-		s.indices = triangulate(actual)
+		if target := s.opts.triangleTarget(); target > 3000 {
+			s.norm, s.indices = chooseGridTopology(img, s.opts, target)
+		} else {
+			s.norm = choosePoints(img, s.opts)
+			actual := scalePoints(s.norm, w, h)
+			s.indices = triangulate(actual)
+		}
 	}
 	pts := scalePoints(s.norm, w, h)
 	mesh := Mesh{Width: w, Height: h, Points: pts, Triangles: make([]Triangle, len(s.indices))}
@@ -113,22 +136,7 @@ func choosePoints(img image.Image, opts Options) []Point {
 	w, h := b.Dx(), b.Dy()
 	rng := rand.New(rand.NewSource(opts.Seed))
 	points := []Point{{0, 0}, {1, 0}, {1, 1}, {0, 1}, {.5, 0}, {1, .5}, {.5, 1}, {0, .5}}
-	weights := make([]float64, w*h)
-	total := 0.0
-	gray := func(x, y int) float64 {
-		r, g, b, _ := img.At(b.Min.X+x, b.Min.Y+y).RGBA()
-		return .299*float64(r>>8) + .587*float64(g>>8) + .114*float64(b>>8)
-	}
-	for y := 1; y < h-1; y++ {
-		for x := 1; x < w-1; x++ {
-			gx := -gray(x-1, y-1) + gray(x+1, y-1) - 2*gray(x-1, y) + 2*gray(x+1, y) - gray(x-1, y+1) + gray(x+1, y+1)
-			gy := -gray(x-1, y-1) - 2*gray(x, y-1) - gray(x+1, y-1) + gray(x-1, y+1) + 2*gray(x, y+1) + gray(x+1, y+1)
-			edge := math.Sqrt(gx*gx+gy*gy) / 1442
-			weight := (1 - opts.EdgeBias) + opts.EdgeBias*(.04+edge*edge*8)
-			weights[y*w+x] = weight
-			total += weight
-		}
-	}
+	weights, total := edgeWeights(img, opts.EdgeBias)
 	if total > 0 {
 		running := 0.0
 		for i, weight := range weights {
@@ -154,6 +162,89 @@ func choosePoints(img image.Image, opts Options) []Point {
 		points = append(points, Point{clamp(float64(x)/float64(max(1, w-1)) + jitterX), clamp(float64(y)/float64(max(1, h-1)) + jitterY)})
 	}
 	return points
+}
+
+// chooseGridTopology provides a linear-time high-detail path. Vertices remain
+// inside their grid neighbourhood so topology cannot fold, while deterministic
+// local candidates pull them toward strong edges. The complete grid always
+// covers the frame and produces no more than the requested triangle ceiling.
+func chooseGridTopology(img image.Image, opts Options, target int) ([]Point, [][3]int) {
+	b := img.Bounds()
+	w, h := b.Dx(), b.Dy()
+	cells := max(16, target/2)
+	aspect := float64(max(1, w)) / float64(max(1, h))
+	cols := max(2, int(math.Sqrt(float64(cells)*aspect)))
+	rows := max(2, cells/cols)
+	for cols*rows*2 > target {
+		if cols >= rows && cols > 2 {
+			cols--
+		} else if rows > 2 {
+			rows--
+		} else {
+			break
+		}
+	}
+	weights, _ := edgeWeights(img, opts.EdgeBias)
+	rng := rand.New(rand.NewSource(opts.Seed))
+	points := make([]Point, 0, (cols+1)*(rows+1))
+	for y := 0; y <= rows; y++ {
+		for x := 0; x <= cols; x++ {
+			baseX := float64(x) / float64(cols)
+			baseY := float64(y) / float64(rows)
+			if x == 0 || x == cols || y == 0 || y == rows {
+				points = append(points, Point{baseX, baseY})
+				continue
+			}
+			bestX, bestY, bestWeight := baseX, baseY, -1.0
+			for sample := 0; sample < 12; sample++ {
+				cx := clamp(baseX + (rng.Float64()-.5)*.62/float64(cols))
+				cy := clamp(baseY + (rng.Float64()-.5)*.62/float64(rows))
+				px := min(w-1, max(0, int(cx*float64(max(1, w-1)))))
+				py := min(h-1, max(0, int(cy*float64(max(1, h-1)))))
+				weight := weights[py*w+px]
+				if weight > bestWeight {
+					bestX, bestY, bestWeight = cx, cy, weight
+				}
+			}
+			points = append(points, Point{bestX, bestY})
+		}
+	}
+	indices := make([][3]int, 0, cols*rows*2)
+	stride := cols + 1
+	for y := 0; y < rows; y++ {
+		for x := 0; x < cols; x++ {
+			a := y*stride + x
+			b0, c, d := a+1, a+stride+1, a+stride
+			if (x+y+int(opts.Seed&1))%2 == 0 {
+				indices = append(indices, [3]int{a, b0, c}, [3]int{a, c, d})
+			} else {
+				indices = append(indices, [3]int{a, b0, d}, [3]int{b0, c, d})
+			}
+		}
+	}
+	return points, indices
+}
+
+func edgeWeights(img image.Image, edgeBias float64) ([]float64, float64) {
+	b := img.Bounds()
+	w, h := b.Dx(), b.Dy()
+	weights := make([]float64, w*h)
+	total := 0.0
+	gray := func(x, y int) float64 {
+		r, g, bl := rgbAtIgnoringAlpha(img, b.Min.X+x, b.Min.Y+y)
+		return .299*r + .587*g + .114*bl
+	}
+	for y := 1; y < h-1; y++ {
+		for x := 1; x < w-1; x++ {
+			gx := -gray(x-1, y-1) + gray(x+1, y-1) - 2*gray(x-1, y) + 2*gray(x+1, y) - gray(x-1, y+1) + gray(x+1, y+1)
+			gy := -gray(x-1, y-1) - 2*gray(x, y-1) - gray(x+1, y-1) + gray(x-1, y+1) + 2*gray(x, y+1) + gray(x+1, y+1)
+			edge := math.Sqrt(gx*gx+gy*gy) / 1442
+			weight := (1 - edgeBias) + edgeBias*(.04+edge*edge*8)
+			weights[y*w+x] = weight
+			total += weight
+		}
+	}
+	return weights, total
 }
 
 type circle struct{ x, y, r2 float64 }
@@ -233,12 +324,26 @@ func sampleTriangle(img image.Image, a, b, c Point) (float64, float64, float64) 
 	for _, p := range ps {
 		x := min(max(int(math.Round(p.X))+ib.Min.X, ib.Min.X), ib.Max.X-1)
 		y := min(max(int(math.Round(p.Y))+ib.Min.Y, ib.Min.Y), ib.Max.Y-1)
-		r, g, b, _ := img.At(x, y).RGBA()
-		rr += float64(r >> 8)
-		gg += float64(g >> 8)
-		bb += float64(b >> 8)
+		r, g, b := rgbAtIgnoringAlpha(img, x, y)
+		rr += r
+		gg += g
+		bb += b
 	}
 	return rr / 4, gg / 4, bb / 4
+}
+
+// rgbAtIgnoringAlpha deliberately excludes alpha from topology and colour
+// sampling. This also preserves the hidden RGB in transparent PNG pixels when
+// the decoder exposes NRGBA, instead of inventing dark transparency edges.
+func rgbAtIgnoringAlpha(img image.Image, x, y int) (float64, float64, float64) {
+	switch c := img.At(x, y).(type) {
+	case color.NRGBA:
+		return float64(c.R), float64(c.G), float64(c.B)
+	case color.RGBA:
+		return float64(c.R), float64(c.G), float64(c.B)
+	}
+	c := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
+	return float64(c.R), float64(c.G), float64(c.B)
 }
 func rgbHex(r, g, b float64) string {
 	const hex = "0123456789abcdef"

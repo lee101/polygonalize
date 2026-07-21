@@ -66,10 +66,12 @@ func renderVideo(w http.ResponseWriter, r *http.Request) {
 	width, height := fitVideo(info.Streams[0].Width, info.Streams[0].Height)
 	fps := parseFPS(info.Streams[0].AvgFrameRate)
 	points, _ := strconv.Atoi(r.FormValue("points"))
+	triangles, _ := strconv.Atoi(r.FormValue("triangles"))
 	seed, _ := strconv.ParseInt(r.FormValue("seed"), 10, 64)
 	edge, _ := strconv.ParseFloat(r.FormValue("edgeBias"), 64)
 	stability, _ := strconv.ParseFloat(r.FormValue("stability"), 64)
-	if err := transcodeVideo(inPath, outPath, width, height, fps, polygon.Options{Points: points, Seed: seed, EdgeBias: edge, Stability: stability}); err != nil {
+	primitive := r.FormValue("primitive")
+	if err := transcodeVideo(inPath, outPath, width, height, fps, polygon.Options{Points: points, Triangles: triangles, Seed: seed, EdgeBias: edge, Stability: stability}, primitive); err != nil {
 		http.Error(w, err.Error(), 422)
 		return
 	}
@@ -117,7 +119,7 @@ func parseFPS(rate string) float64 {
 	return 24
 }
 
-func transcodeVideo(inPath, outPath string, w, h int, fps float64, opts polygon.Options) error {
+func transcodeVideo(inPath, outPath string, w, h int, fps float64, opts polygon.Options, primitive string) error {
 	size := w * h * 4
 	decode := exec.Command("ffmpeg", "-v", "error", "-i", inPath, "-t", "12", "-vf", fmt.Sprintf("scale=%d:%d", w, h), "-f", "rawvideo", "-pix_fmt", "rgba", "pipe:1")
 	encode := exec.Command("ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", fmt.Sprintf("%dx%d", w, h), "-r", fmt.Sprintf("%.4f", fps), "-i", "pipe:0", "-an", "-c:v", "libvpx-vp9", "-deadline", "realtime", "-cpu-used", "6", "-row-mt", "1", "-b:v", "0", "-crf", "36", outPath)
@@ -149,7 +151,7 @@ func transcodeVideo(inPath, outPath string, w, h int, fps float64, opts polygon.
 			return fmt.Errorf("decode frame: %w", readErr)
 		}
 		img := &image.RGBA{Pix: frame, Stride: w * 4, Rect: image.Rect(0, 0, w, h)}
-		if _, err = encoded.Write(polygon.Raster(session.Frame(img)).Pix); err != nil {
+		if _, err = encoded.Write(polygon.RasterPrimitive(session.Frame(img), primitive).Pix); err != nil {
 			return fmt.Errorf("encode frame: %w", err)
 		}
 	}

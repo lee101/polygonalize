@@ -50,9 +50,10 @@ func decode(r *http.Request) (image.Image, polygon.Options, error) {
 		return nil, polygon.Options{}, err
 	}
 	p, _ := strconv.Atoi(r.FormValue("points"))
+	triangles, _ := strconv.Atoi(r.FormValue("triangles"))
 	seed, _ := strconv.ParseInt(r.FormValue("seed"), 10, 64)
 	edge, _ := strconv.ParseFloat(r.FormValue("edgeBias"), 64)
-	return im, polygon.Options{Points: p, Seed: seed, EdgeBias: edge}, nil
+	return im, polygon.Options{Points: p, Triangles: triangles, Seed: seed, EdgeBias: edge}, nil
 }
 func mesh(w http.ResponseWriter, r *http.Request) {
 	im, o, err := decode(r)
@@ -70,14 +71,15 @@ func render(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m := polygon.Generate(im, o)
+	primitive := r.FormValue("primitive")
 	if strings.EqualFold(r.FormValue("format"), "png") {
 		w.Header().Set("Content-Type", "image/png")
-		_ = png.Encode(w, polygon.Raster(m))
+		_ = png.Encode(w, polygon.RasterPrimitive(m, primitive))
 		return
 	}
 	w.Header().Set("Content-Type", "image/svg+xml")
 	w.Header().Set("Content-Disposition", `attachment; filename="polygonalized.svg"`)
-	_ = polygon.WriteSVG(w, m)
+	_ = polygon.WriteSVGPrimitive(w, m, primitive)
 }
 func ioJSON(w http.ResponseWriter, v any) { _ = json.NewEncoder(w).Encode(v) }
 func security(next http.Handler) http.Handler {
