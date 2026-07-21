@@ -1,7 +1,7 @@
 name: polygon
 runtime: server
 build:
-  command: make build
+  command: test -f Dockerfile
   dockerfile: Dockerfile
 output: web
 run:
@@ -13,4 +13,3 @@ github:
   repo: lee101/polygonalize
   branch: main
   autoDeploy: true
-
