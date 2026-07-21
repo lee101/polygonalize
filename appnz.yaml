@@ -13,11 +13,15 @@ build:
     go build -trimpath -o bin/polygonalize-server ./cmd/polygonalize-server
     GOOS=js GOARCH=wasm go build -trimpath -ldflags="-s -w" -o web/assets/polygonalize.wasm ./cmd/wasm
     cp "$GOROOT/lib/wasm/wasm_exec.js" web/assets/wasm_exec.js
-    chmod 0755 bin/polygonalize-server
+    mkdir -p "$POLYGONALIZE_GO_TMP/ffmpeg"
+    curl -fsSL https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o "$POLYGONALIZE_GO_TMP/ffmpeg.tar.xz"
+    tar -xJf "$POLYGONALIZE_GO_TMP/ffmpeg.tar.xz" --strip-components=1 -C "$POLYGONALIZE_GO_TMP/ffmpeg"
+    cp "$POLYGONALIZE_GO_TMP/ffmpeg/ffmpeg" "$POLYGONALIZE_GO_TMP/ffmpeg/ffprobe" bin/
+    chmod 0755 bin/polygonalize-server bin/ffmpeg bin/ffprobe
   dockerfile: Dockerfile
 output: web
 run:
-  command: ./bin/polygonalize-server
+  command: PATH="$PWD/bin:$PATH" ./bin/polygonalize-server
   port: 8080
 env:
   POLYGONALIZE_MAX_UPLOAD_MB: "16"
